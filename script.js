@@ -1,7 +1,9 @@
 /* written by P.B. - 2017 */
 
+var b;
 var s;
 var c;
+var w;
 var ctx;
 var map;
 	
@@ -10,14 +12,12 @@ var interval = 50; //tick interval millisecs
 var wCount;
 var hCount;
 
-function onSlider(){
-	interval = s.value * 10;
-}
-
 window.onload = function(){
-	document.body.style.overflow = "hidden";
-	var W = window.innerWidth - 18;
-	var H = window.innerHeight - 18;
+	w = window;
+	b = document.body;
+	b.style.overflow = "hidden";
+	var W = w.innerWidth - 18;
+	var H = w.innerHeight - 18;
 	wCount = Math.ceil(W/P)-1;
 	hCount = Math.ceil(H/P)-1;
 	c = document.createElement("canvas");
@@ -27,36 +27,55 @@ window.onload = function(){
 	c.style.margin = "auto";
 	c.style.border = "1px solid #d3d3d3";
 	ctx = c.getContext("2d");
-// 	c.addEventListener('dblclick', toggleClock, true);
+	c.addEventListener('dblclick', reset, true);
 	c.addEventListener('mousedown', mouseDown, true);
 	c.addEventListener('mouseup', mouseUp, true);
 	c.addEventListener('contextmenu', onRightClick, true);
-	document.body.addEventListener('keydown', keyDown, true);
-	document.body.appendChild(c);
+	b.addEventListener('keydown', keyDown, true);
+	b.appendChild(c);
 	initMap();
-	// var w = new worker;
 	createSlider();
-	info();
+	initSplash();
 }
 
 function createSlider(){
 	s = document.createElement("input");
 	s.type = "range";
 	s.min = 0;
-	s.max = 50;
-	s.value = 5; 
+	s.max = 100;
+	s.value = 75; 
 	s.style.position = "fixed";
 	s.style.bottom = "18px";
  	s.style.width = "80%";
-  	s.style.marginLeft = "10%"; 
-	document.body.appendChild(s);	
-	s.addEventListener('input', onSlider, true);
+	s.style.marginLeft = "10%";
+	b.appendChild(s);
+	s.addEventListener('input', setInterval, true);
 }
 
-function info(){
-	alert("Start/Stop - Space\nDraw - Left Click\nReset - Right Click");
+function setInterval(){
+	if(s.value == s.min){
+		interval = 1e16;
+	}else{
+		interval = (s.max - s.value) * 5;
+	}
 }
 
+function getId(id){
+	return document.getElementById(id);
+}
+
+function initSplash(){
+	var div = getId('splash');
+	div.style.left = (w.innerWidth - splash.offsetWidth)/2 + 'px';
+	div.style.top = (w.innerHeight - splash.offsetHeight)/2 + 'px';
+	div.addEventListener('click', function(){
+		b.removeChild(div)
+	}, true);
+ 	getId('wiki').addEventListener('click', function(e){
+		 e.stopPropagation();
+		 e.cancelBubble = true;
+	}, true);
+}
 
 function keyDown(e){
 	if(e.keyCode==32){
@@ -66,7 +85,7 @@ function keyDown(e){
 
 function onRightClick(e){
 	e.preventDefault();
-	reset();
+	toggleClock();
 	return false;
 }
 
@@ -83,8 +102,8 @@ function mouseUp(e){
 
 // var tickCount;
 var cid;
-function toggleClock(){
-// 	tickCount = 0;
+function toggleClock(state){
+	// tickCount = 0;
 	cid = cid ? window.clearTimeout(cid) : onTick();
 };
 
@@ -93,7 +112,7 @@ function onTick(){
 	evolve();
 	drawMap();
 	cid = window.setTimeout(onTick, interval);
-// 	if(++tickCount==300){toggleClock()};
+	// if(++tickCount==300){toggleClock()};
 }
 
 function initMap(){
@@ -133,7 +152,7 @@ function pressure(x,y){
 	return count;
 }
 
-evolve = function(){
+var evolve = function(){
 	var grow = (x,y)=>{map[x][y] += 2}
 	var stay = (x,y)=>{map[x][y] && (map[x][y] = 3)}
 	return function(){
@@ -150,7 +169,7 @@ evolve = function(){
 
 function drawMap(){
 	map.each((x,y)=>{
-		let state = map[x][y];
+		var state = map[x][y];
 		if(state==1){
 			map[x][y] = 0;
  			flag && drawPixel(x,y,0);
