@@ -7,7 +7,7 @@ var w;
 var ctx;
 var map;
 	
-var P = 8; //pixel size
+var P = 9; //pixel size
 var interval = 50; //tick interval millisecs
 var wCount;
 var hCount;
@@ -27,10 +27,13 @@ window.onload = function(){
 	c.style.margin = "auto";
 	c.style.border = "1px solid #d3d3d3";
 	ctx = c.getContext("2d");
-	c.addEventListener('dblclick', reset, true);
+	c.addEventListener('dblclick', onDblClick, true);
 	c.addEventListener('mousedown', mouseDown, true);
 	c.addEventListener('mouseup', mouseUp, true);
 	c.addEventListener('contextmenu', onRightClick, true);
+	c.addEventListener('touchstart', onTouch, false);
+	c.addEventListener('touchmove', onTouch, false);
+	c.addEventListener('touchend', onTouchEnd, false);
 	b.addEventListener('keydown', keyDown, true);
 	b.appendChild(c);
 	initMap();
@@ -52,14 +55,6 @@ function createSlider(){
 	s.addEventListener('input', setInterval, true);
 }
 
-function setInterval(){
-	if(s.value == s.min){
-		interval = 1e16;
-	}else{
-		interval = (s.max - s.value) * 5;
-	}
-}
-
 function getId(id){
 	return document.getElementById(id);
 }
@@ -69,7 +64,7 @@ function initSplash(){
 	div.style.left = (w.innerWidth - splash.offsetWidth)/2 + 'px';
 	div.style.top = (w.innerHeight - splash.offsetHeight)/2 + 'px';
 	div.addEventListener('click', function(){
-		b.removeChild(div)
+		div.style.visibility = 'hidden';
 	}, true);
  	getId('wiki').addEventListener('click', function(e){
 		 e.stopPropagation();
@@ -83,37 +78,81 @@ function keyDown(e){
 	}
 }
 
+function onTouch(e){
+	e.preventDefault();
+	addPixel(e.changedTouches[0].pageX, e.changedTouches[0].pageY);
+}
+
 function onRightClick(e){
 	e.preventDefault();
 	toggleClock();
 	return false;
 }
 
+function onDblClick(e){
+	reset(e);
+	getId('splash').style.visibility = 'visible';
+}
+
 function mouseDown(e){
 	curP.x = -1;
 	curP.y = -1;
-	addPixel(e);
-	c.addEventListener('mousemove', addPixel, true);
+	eAddPixel(e);
+	c.addEventListener('mousemove', eAddPixel, true);
 }
 
 function mouseUp(e){
-	c.removeEventListener('mousemove', addPixel, true);
+	c.removeEventListener('mousemove', eAddPixel, true);
 }
 
-// var tickCount;
+function setInterval(){
+	if(s.value == s.min){
+		interval = 1e16;
+		running = false;
+	}else{
+		interval = (s.max - s.value) * 5;
+		if(running){
+			clearTimeout(cid);
+			cid = setTimeout(onTick, interval);
+		}else{
+			toggleClock();
+		}
+	}
+}
+
+var running;
 var cid;
 function toggleClock(state){
-	// tickCount = 0;
-	cid = cid ? window.clearTimeout(cid) : onTick();
-};
-
-var flag = true;
-function onTick(){
-	evolve();
-	drawMap();
-	cid = window.setTimeout(onTick, interval);
-	// if(++tickCount==300){toggleClock()};
+	if(interval == 1e16) return;
+	if(running){
+		running = false;
+		clearTimeout(cid);
+	}else{
+		running = true;
+		onTick();
+	}
 }
+
+function onTick(){
+	if(running){
+		evolve();
+		drawMap();
+		cid = setTimeout(onTick, interval);
+	}
+}
+
+var onTouchEnd = function(){
+	var last = Date.now();
+	return function senseDblTap(e){
+		var now = Date.now();
+		var gap = now - last;
+		last = now;
+		if (gap < 500 && gap > 0){
+			onDblClick(e);
+			event.preventDefault();
+		}
+	}
+}();
 
 function initMap(){
 	map = new Array(wCount);
@@ -133,7 +172,7 @@ function initMap(){
 function reset(e){
 	cid && toggleClock();
 	map.each((x,y)=>{map[x][y]=1 });
-	drawMap();	
+	drawMap();
 }
 
 function pressure(x,y){
@@ -167,6 +206,7 @@ var evolve = function(){
 	}
 }();
 
+var flag = true;
 function drawMap(){
 	map.each((x,y)=>{
 		var state = map[x][y];
@@ -192,10 +232,14 @@ function getSq(x,y){
 	y -= y % P;
 }
 
+function eAddPixel(e){
+	addPixel(e.pageX, e.pageY);
+}
+
 var curP = {x:-1,y:-1}
-function addPixel(e){
-	var x = e.pageX - c.offsetLeft;  
-	var y = e.pageY - c.offsetTop;
+function addPixel(pageX, pageY){
+	var x = pageX - c.offsetLeft;  
+	var y = pageY - c.offsetTop;
 	x = Math.floor(x/P);
 	x = Math.max(0,Math.min(x,wCount-1));
 	y = Math.floor(y/P);
