@@ -1,8 +1,9 @@
 /* written by P.B. - 2017 */
+/* https://github.com/PhilRB/ */
 
 // Settings
-var P = 9; //pixel size
-var interval = 50; //tick interval millisecs
+var cellSize = 9; //px
+var interval = 50; //initial interval (ms)
 var color1 = 'white';
 var color2 = 'black';
 var noWrap = false;
@@ -23,13 +24,13 @@ window.onload = function () {
 	body.style.overflow = "hidden";
 	let W = window.innerWidth - 18;
 	let H = window.innerHeight - 18;
-	wCount = Math.ceil(W / P) - 1;
-	hCount = Math.ceil(H / P) - 1;
+	wCount = Math.ceil(W / cellSize) - 1;
+	hCount = Math.ceil(H / cellSize) - 1;
 	xHigh = wCount - 1;
 	yHigh = hCount - 1;
 	canvas = document.createElement("canvas");
-	canvas.width = wCount * P;
-	canvas.height = hCount * P;
+	canvas.width = wCount * cellSize;
+	canvas.height = hCount * cellSize;
 	canvas.style.display = "block";
 	canvas.style.margin = "auto";
 	canvas.style.border = "1px solid #d3d3d3";
@@ -236,7 +237,7 @@ function drawMap() {
 
 function drawPixel(x, y, active) {
 	ctx.fillStyle = active ? color1 : color2;
-	ctx.fillRect(x * P, y * P, P, P);
+	ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
 }
 
 function eAddPixel(e) {
@@ -247,9 +248,9 @@ var currentPos = { x: -1, y: -1 }
 function addPixel(pageX, pageY) {
 	var x = pageX - canvas.offsetLeft;
 	var y = pageY - canvas.offsetTop;
-	x = Math.floor(x / P);
+	x = Math.floor(x / cellSize);
 	x = Math.max(0, Math.min(x, xHigh));
-	y = Math.floor(y / P);
+	y = Math.floor(y / cellSize);
 	y = Math.max(0, Math.min(y, yHigh));
 	if (currentPos.x != x || currentPos.y != y) {
 		currentPos.x = x;
