@@ -7,6 +7,51 @@ var interval = 50; //initial interval (ms)
 var color1 = 'white';
 var color2 = 'black';
 var noWrap = false;
+var randSeed = 0.3; //between 0 and 1
+
+function testSpeed() {
+	// param
+	var saved = {
+		cellSize: cellSize,
+		noWrap: noWrap,
+		randSeed: randSeed,
+		wCount: wCount,
+		hCount: hCount,
+		xHigh: xHigh,
+		yHigh: yHigh,
+		interval: interval
+	}
+	cellSize = 2;
+	noWrap = false;
+	randSeed = 0.3;
+	wCount = 673;
+	hCount = 326;
+	xHigh = 672;
+	yHigh = 325;
+	interval = 0;
+	// setup
+	toggleClock(true);
+	initMap();
+	// run test
+	var testTime = 5000;
+	function endTest() {
+		toggleClock(true);
+		console.log("generations per second: " + genCount/s);
+	}
+	var timerId = setTimeout(endTest, testTime);
+	toggleClock();
+	// end
+	cellSize = saved.cellSize;
+	noWrap = saved.noWrap;
+	randSeed = saved.randSeed;
+	wCount = saved.wCount;
+	hCount = saved.hCount;
+	xHigh = saved.xHigh;
+	yHigh = saved.yHigh;
+	interval = saved.interval;
+	// results
+	// 6.6 gen/s
+}
 
 // Globals
 var body;
@@ -17,13 +62,14 @@ var ctx;
 var map;
 var wCount, xHigh;
 var hCount, yHigh;
+var genCount;
 
 window.onload = function () {
 	window = window;
 	body = document.body;
 	body.style.overflow = "hidden";
-	let W = window.innerWidth - 18;
-	let H = window.innerHeight - 18;
+	var W = window.innerWidth - 18;
+	var H = window.innerHeight - 18;
 	wCount = Math.ceil(W / cellSize) - 1;
 	hCount = Math.ceil(H / cellSize) - 1;
 	xHigh = wCount - 1;
@@ -103,8 +149,7 @@ function onDblClick(e) {
 }
 
 function mouseDown(e) {
-	currentPos.x = -1;
-	currentPos.y = -1;
+	currentPx = null;
 	eAddPixel(e);
 	canvas.addEventListener('mousemove', eAddPixel, true);
 }
@@ -148,6 +193,7 @@ function onTick() {
 		evolve();
 		drawMap();
 		timerId = setTimeout(onTick, interval);
+		genCount++;
 	}
 }
 
@@ -168,83 +214,94 @@ function initMap() {
 	map = new Array(wCount);
 	for (var x = 0; x < wCount; x++) {
 		map[x] = new Array(hCount);
-	}
-	map.each = (f) => {
-		for (var x = 0; x < wCount; x++) {
-			for (var y = 0; y < hCount; y++) {
-				f(x, y);
-			}
+		for (var y = 0; y < hCount; y++) {
+			map[x][y] = new Pixel(x, y);
 		}
 	}
+	map.each = (f) => {
+		map.forEach((col) => {
+			col.forEach((px) => {
+				f(px);
+			})
+		})
+	}
+	map.each(orient);
 	reset();
+}
+
+function orient(px) {
+	var T = px.y === 0 ? yHigh : px.y - 1;
+	var B = px.y === yHigh ? 0 : px.y + 1;
+	var L = px.x === 0 ? xHigh : px.x - 1;
+	var R = px.x === xHigh ? 0 : px.x + 1;
+	px.adjuncts = [
+		map[L][T],
+		map[L][px.y],
+		map[L][B],
+		map[px.x][T],
+		map[px.x][B],
+		map[R][T],
+		map[R][px.y],
+		map[R][B]
+	]
 }
 
 function reset(e) {
 	timerId && toggleClock(true);
-	map.each((x, y) => { map[x][y] = 1 });
+	map.each((px) => { px.reset() });
 	drawMap();
+	genCount = 0;
 }
 
-function pressure(x, y) {
-	if (noWrap && (y === 0 || y === yHigh || x === 0 || x === xHigh)) {
-		return -1;
-	}
-	let count = 0;
-	let T = y === 0 ? yHigh : y - 1;
-	let B = y === yHigh ? 0 : y + 1;
-	let L = x === 0 ? xHigh : x - 1;
-	let R = x === xHigh ? 0 : x + 1;
-	map[L][T] % 2 && ++count;
-	map[L][y] % 2 && ++count;
-	map[L][B] % 2 && ++count;
-	map[x][T] % 2 && ++count;
-	map[x][B] % 2 && ++count;
-	map[R][T] % 2 && ++count;
-	map[R][y] % 2 && ++count;
-	map[R][B] % 2 && ++count;
-	return count;
+function evolve() {
+	map.each((px) => { px.evolve() })
 }
-
-var evolve = function () {
-	var grow = (x, y) => { map[x][y] += 2 }
-	var stay = (x, y) => { map[x][y] && (map[x][y] = 3) }
-	return function evolve() {
-		map.each((x, y) => {
-			var p = pressure(x, y);
-			if (p === 3) {
-				grow(x, y);
-			} else if (p === 2) {
-				stay(x, y);
-			};
-		})
-	}
-}();
 
 function drawMap() {
-	map.each((x, y) => {
-		var state = map[x][y];
-		if (state == 1) {
-			map[x][y] = 0;
-			drawPixel(x, y, 0);
-		} else if (state > 1) {
-			if (state == 2) {
-				drawPixel(x, y, 1);
-			}
-			map[x][y] = 1;
-		};
-	})
+	map.each((px) => {
+		if (px.change) {
+			px.active = !px.active;
+			drawPixel(px);
+			px.change = false;
+		}
+	});
 }
 
-function drawPixel(x, y, active) {
-	ctx.fillStyle = active ? color1 : color2;
-	ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+function seed() {
+	return Math.random() > randSeed;
+}
+
+function Pixel(x, y) {
+	this.x = x;
+	this.y = y;
+	this.left = x * cellSize;
+	this.top = y * cellSize;
+	this.isEdge = noWrap && (y === 0 || y === yHigh || x === 0 || x === xHigh);
+	this.active = false;
+	this.change = true;
+	this.reset = () => { this.active = seed(); this.change = true };
+	this.evolve = () => {
+		if (this.isEdge) { return -1 };
+		var p = 0;
+		this.adjuncts.forEach((px) => { px.active && p++ })
+		if (p === 3) {
+			!this.active && (this.change = true); //grow
+		} else if (p !== 2) {
+			this.active && (this.change = true); //die
+		}
+	}
+}
+
+function drawPixel(px) {
+	ctx.fillStyle = px.active ? color1 : color2;
+	ctx.fillRect(px.left, px.top, cellSize, cellSize);
 }
 
 function eAddPixel(e) {
 	addPixel(e.pageX, e.pageY);
 }
 
-var currentPos = { x: -1, y: -1 }
+var currentPx;
 function addPixel(pageX, pageY) {
 	var x = pageX - canvas.offsetLeft;
 	var y = pageY - canvas.offsetTop;
@@ -252,10 +309,10 @@ function addPixel(pageX, pageY) {
 	x = Math.max(0, Math.min(x, xHigh));
 	y = Math.floor(y / cellSize);
 	y = Math.max(0, Math.min(y, yHigh));
-	if (currentPos.x != x || currentPos.y != y) {
-		currentPos.x = x;
-		currentPos.y = y;
-		map[x][y] = 1;
-		drawPixel(x, y, 1);
+	px = map[x][y];
+	if (currentPx !== px) {
+		currentPx = px;
+		currentPx.active = true;
+		drawPixel(currentPx);
 	}
 }
